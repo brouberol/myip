@@ -11,7 +11,8 @@ import (
 )
 
 var (
-	listenAddr string
+	listenAddr  string
+	proxyHeader string
 )
 
 func logging(logger *log.Logger) func(http.Handler) http.Handler {
@@ -27,6 +28,7 @@ func logging(logger *log.Logger) func(http.Handler) http.Handler {
 
 func main() {
 	flag.StringVar(&listenAddr, "listen-addr", ":5000", "server listen address")
+	flag.StringVar(&proxyHeader, "proxy-header", "", "Header containing requester's IP. Use when behind a reverse proxy.")
 	flag.Parse()
 
 	logger := log.New(os.Stdout, "http: ", log.LstdFlags)
@@ -34,7 +36,18 @@ func main() {
 
 	router := http.NewServeMux()
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		remoteIp := strings.Split(r.RemoteAddr, ":")[0]
+		var remoteIp string
+		if len(proxyHeader) > 0 {
+			header, ok := r.Header[proxyHeader]
+			if ok {
+				remoteIp = header[0]
+			} else {
+				fmt.Fprint(w, "Error")
+				return
+			}
+		} else {
+			remoteIp = strings.Split(r.RemoteAddr, ":")[0]
+		}
 		fmt.Fprintf(w, "%s\n", remoteIp)
 	})
 
